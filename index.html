@@ -271,7 +271,18 @@
 
     <div class="divider"></div>
 
-    <h2 class="section-title"><span class="n">03</span> الكراسي المسجّلة</h2>
+    <div class="card">
+      <h2 class="section-title"><span class="n">03</span> ربط صور الأجزاء بالجملة</h2>
+      <p class="helper">حط سطر لكل جزء بالشكل: <b>اسم الجزء = رابط الصورة</b>، وهيتطبق الرابط تلقائيًا على أي جزء بنفس الاسم في كل الكراسي (الحالية والمستقبلية). مثال:</p>
+      <p class="helper" style="background:var(--panel-2);padding:8px 10px;border-radius:6px;direction:ltr;text-align:left">باليته ادبتر 5mm = https://raw.githubusercontent.com/.../img1.png</p>
+      <textarea id="bulkImageInput" placeholder="اسم الجزء = رابط الصورة (سطر لكل جزء)" style="width:100%;min-height:120px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:12.5px;direction:ltr;text-align:left"></textarea>
+      <div style="margin-top:10px"><button class="primary" id="applyBulkImagesBtn">تطبيق الروابط</button></div>
+      <div id="bulkImageStatus"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title"><span class="n">04</span> الكراسي المسجّلة</h2>
     <div id="chairsList"></div>
   </div>
 
@@ -859,6 +870,37 @@ document.getElementById('importFile').addEventListener('change', async (e)=>{
     statusEl.innerHTML = `<div class="status-msg err">حصل خطأ في قراءة الملف: ${escapeHtml(err.message)}</div>`;
   }
   e.target.value = '';
+});
+
+document.getElementById('applyBulkImagesBtn').addEventListener('click', async ()=>{
+  const raw = document.getElementById('bulkImageInput').value;
+  const statusEl = document.getElementById('bulkImageStatus');
+  const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
+  const map = {};
+  lines.forEach(line=>{
+    const idx = line.indexOf('=');
+    if(idx === -1) return;
+    const name = line.slice(0, idx).trim();
+    const url = line.slice(idx+1).trim();
+    if(name && url) map[name] = url;
+  });
+  if(!Object.keys(map).length){
+    statusEl.innerHTML = `<div class="status-msg err">مفيش أسطر صالحة اتلقت (لازم يكون الشكل: اسم الجزء = رابط)</div>`;
+    return;
+  }
+  let matched = 0;
+  Object.keys(chairsData).forEach(chairName=>{
+    chairsData[chairName].forEach(part=>{
+      if(map[part.name.trim()]){
+        part.image = map[part.name.trim()];
+        matched++;
+      }
+    });
+  });
+  await storeSet('chairsData', chairsData);
+  statusEl.innerHTML = `<div class="status-msg ok">اتطبقت الصور على ${matched} جزء ✓</div>`;
+  renderChairsList();
+  renderTickets();
 });
 
 /* ---------- SETTINGS TAB ---------- */
