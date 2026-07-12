@@ -625,7 +625,7 @@ async function sendDept(chairName, dept, parts, emails, ticketEl){
       }).join('')}
     </table>
   `.trim();
-  let okCount = 0, failCount = 0;
+  let okCount = 0, failCount = 0, lastErrText = '';
 
   for(const email of emails){
     try{
@@ -646,8 +646,9 @@ async function sendDept(chairName, dept, parts, emails, ticketEl){
           }
         })
       });
-      if(resp.ok) okCount++; else failCount++;
-    }catch(e){ failCount++; }
+      if(resp.ok) okCount++;
+      else{ failCount++; lastErrText = `(${resp.status}) ${await resp.text()}`; }
+    }catch(e){ failCount++; lastErrText = e.message || String(e); }
   }
 
   btn.disabled = false;
@@ -660,7 +661,7 @@ async function sendDept(chairName, dept, parts, emails, ticketEl){
     statusEl.style.color = 'var(--amber)';
     stampEl.classList.remove('fail'); stampEl.classList.add('show');
   } else {
-    statusEl.textContent = 'فشل الإرسال — راجع إعدادات EmailJS ودليل التفعيل';
+    statusEl.textContent = `فشل الإرسال: ${lastErrText || 'خطأ غير معروف'}`;
     statusEl.style.color = 'var(--red)';
     stampEl.textContent = 'فشل الإرسال ✕';
     stampEl.classList.add('show','fail');
