@@ -1,0 +1,941 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<title>لوحة توزيع الكراسي</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;500;700;900&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg:#111820;
+    --bg-2:#0c1218;
+    --panel:#19222c;
+    --panel-2:#212c38;
+    --border:#2b3744;
+    --amber:#f2a93c;
+    --amber-dark:#c9821c;
+    --steel:#5b9bd5;
+    --green:#5cb87a;
+    --red:#e0655b;
+    --text:#e9eef4;
+    --muted:#8a97a6;
+    --mono:'IBM Plex Mono',monospace;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 0%, rgba(91,155,213,0.08), transparent 40%),
+      radial-gradient(circle at 85% 100%, rgba(242,169,60,0.06), transparent 45%),
+      var(--bg);
+    color:var(--text);
+    font-family:'Tajawal',sans-serif;
+    min-height:100vh;
+  }
+  .wrap{max-width:1100px;margin:0 auto;padding:28px 20px 60px}
+
+  /* header */
+  header{display:flex;align-items:center;gap:16px;margin-bottom:8px}
+  .badge{
+    width:52px;height:52px;border-radius:10px;
+    background:linear-gradient(155deg,var(--amber),var(--amber-dark));
+    display:flex;align-items:center;justify-content:center;
+    font-size:24px;flex:none;
+    box-shadow:0 6px 16px rgba(242,169,60,0.25);
+  }
+  h1{font-size:22px;font-weight:900;margin:0}
+  .sub{color:var(--muted);font-size:13px;margin-top:2px}
+  .route-strip{
+    display:flex;align-items:center;gap:6px;margin:18px 0 26px;
+    font-family:var(--mono);font-size:12px;color:var(--muted);
+    flex-wrap:wrap;
+  }
+  .route-strip .stop{
+    padding:5px 10px;border:1px dashed var(--border);border-radius:20px;
+    background:var(--panel);
+  }
+  .route-strip .arrow{color:var(--amber)}
+
+  /* tabs */
+  .tabs{display:flex;gap:4px;border-bottom:1px solid var(--border);margin-bottom:24px}
+  .tab{
+    padding:10px 16px;font-size:14px;font-weight:700;color:var(--muted);
+    cursor:pointer;border-bottom:2px solid transparent;user-select:none;
+  }
+  .tab.active{color:var(--amber);border-color:var(--amber)}
+  .panel{display:none}
+  .panel.active{display:block}
+
+  /* card base */
+  .card{
+    background:var(--panel);border:1px solid var(--border);border-radius:12px;
+    padding:18px;
+  }
+  .card+.card{margin-top:14px}
+
+  /* search */
+  .search-row{display:flex;gap:10px;margin-bottom:20px}
+  input[type=text],input[type=email],select{
+    background:var(--bg-2);border:1px solid var(--border);color:var(--text);
+    border-radius:8px;padding:10px 12px;font-family:'Tajawal',sans-serif;font-size:14px;
+  }
+  input[list]{flex:1;font-size:16px;padding:12px 14px}
+  input:focus,select:focus{outline:none;border-color:var(--steel)}
+  button{
+    font-family:'Tajawal',sans-serif;font-weight:700;font-size:13px;
+    border:none;border-radius:8px;padding:10px 16px;cursor:pointer;
+    transition:filter .15s, transform .1s;
+  }
+  button:active{transform:scale(.97)}
+  button.primary{background:linear-gradient(155deg,var(--amber),var(--amber-dark));color:#20140a}
+  button.primary:hover{filter:brightness(1.08)}
+  button.ghost{background:transparent;border:1px solid var(--border);color:var(--text)}
+  button.ghost:hover{border-color:var(--steel)}
+  button.danger{background:transparent;border:1px solid var(--red);color:var(--red)}
+  button:disabled{opacity:.5;cursor:not-allowed}
+
+  /* department ticket cards */
+  .tickets{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px;margin-top:6px}
+  .ticket{
+    position:relative;overflow:hidden;
+    background:var(--panel);border:1px solid var(--border);border-radius:10px;
+    padding:0;
+  }
+  .ticket .ticket-head{
+    display:flex;justify-content:space-between;align-items:center;
+    padding:14px 16px;border-bottom:1px dashed var(--border);
+    background:var(--panel-2);
+  }
+  .ticket .dept-name{font-weight:900;font-size:15px}
+  .ticket .dept-emails{font-family:var(--mono);font-size:11px;color:var(--muted);margin-top:3px}
+  .ticket-body{padding:12px 16px}
+  table.parts{width:100%;border-collapse:collapse;font-size:13px}
+  table.parts th{
+    text-align:right;color:var(--muted);font-weight:600;font-size:11px;
+    padding:4px 0;border-bottom:1px solid var(--border);
+  }
+  table.parts td{padding:6px 0;border-bottom:1px solid rgba(255,255,255,0.03)}
+  table.parts td.qty{font-family:var(--mono);color:var(--amber);text-align:left;white-space:nowrap}
+  .ticket-foot{padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+  .stamp{
+    position:absolute;top:14px;left:14px;
+    border:2px solid var(--green);color:var(--green);
+    font-family:var(--mono);font-weight:700;font-size:11px;
+    padding:3px 9px;border-radius:6px;
+    transform:rotate(-14deg);opacity:0;transition:opacity .25s;
+    pointer-events:none;
+  }
+  .stamp.show{opacity:.9}
+  .stamp.fail{border-color:var(--red);color:var(--red)}
+  .empty-note{color:var(--muted);font-size:12px;padding:6px 0}
+
+  /* settings */
+  .dept-row{display:flex;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--border);flex-wrap:wrap}
+  .dept-row .dname{width:110px;font-weight:700;flex:none}
+  .chips{display:flex;flex-wrap:wrap;gap:6px;flex:1}
+  .chip{
+    background:var(--panel-2);border:1px solid var(--border);border-radius:16px;
+    padding:5px 10px;font-size:12px;font-family:var(--mono);display:flex;align-items:center;gap:6px;
+  }
+  .chip button{background:none;border:none;color:var(--muted);padding:0;font-size:14px;line-height:1;cursor:pointer}
+  .chip button:hover{color:var(--red)}
+  .add-email{display:flex;gap:6px}
+  .add-email input{width:180px}
+  label.field-label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:700}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr}}
+  .field{margin-bottom:14px}
+  .field input{width:100%}
+  .status-msg{font-size:12px;margin-top:8px;padding:8px 10px;border-radius:6px}
+  .status-msg.ok{background:rgba(92,184,122,0.12);color:var(--green)}
+  .status-msg.err{background:rgba(224,101,91,0.12);color:var(--red)}
+
+  h2.section-title{font-size:16px;margin:0 0 14px;display:flex;align-items:center;gap:8px}
+  h2.section-title .n{font-family:var(--mono);color:var(--amber);font-size:12px}
+  p.helper{color:var(--muted);font-size:13px;line-height:1.9}
+  .divider{height:1px;background:var(--border);margin:22px 0}
+
+  /* data manager */
+  .chair-block{border:1px solid var(--border);border-radius:10px;margin-bottom:14px;overflow:hidden}
+  .chair-block-head{
+    background:var(--panel-2);padding:12px 16px;display:flex;justify-content:space-between;align-items:center;
+    cursor:pointer;
+  }
+  .chair-block-head .cname{font-weight:900}
+  .chair-block-body{padding:14px 16px;display:none}
+  .chair-block-body.open{display:block}
+  .part-row{display:grid;grid-template-columns:46px 1.8fr 1.1fr 60px 34px;gap:8px;margin-bottom:8px;align-items:center}
+  .part-row input,.part-row select{width:100%}
+  .add-part-row{display:grid;grid-template-columns:46px 1.8fr 1.1fr 60px 34px;gap:8px;margin-top:10px}
+  .thumb{
+    width:38px;height:38px;border-radius:6px;object-fit:cover;
+    background:var(--bg-2);border:1px solid var(--border);flex:none;
+  }
+  .thumb-placeholder{
+    width:38px;height:38px;border-radius:6px;background:var(--bg-2);border:1px dashed var(--border);
+    display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);flex:none;
+  }
+  table.parts td.img-cell{width:42px}
+  table.parts img.thumb{width:34px;height:34px}
+  .icon-btn{
+    width:34px;height:34px;border-radius:8px;background:var(--panel-2);border:1px solid var(--border);
+    color:var(--muted);cursor:pointer;font-size:14px;display:flex;align-items:center;justify-content:center;
+  }
+  .icon-btn:hover{color:var(--red);border-color:var(--red)}
+
+  .guide ol{padding-inline-start:20px;line-height:2;font-size:14px}
+  .guide code{background:var(--panel-2);padding:2px 6px;border-radius:5px;font-family:var(--mono);font-size:12.5px;color:var(--amber)}
+  .guide .step-card{background:var(--panel);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px}
+  .guide .step-card h3{margin:0 0 6px;font-size:14px}
+
+  /* order list */
+  .order-row{
+    display:flex;align-items:center;gap:10px;padding:9px 12px;
+    background:var(--panel-2);border:1px solid var(--border);border-radius:8px;margin-bottom:8px;
+  }
+  .order-row .oc-name{flex:1;font-weight:700;font-size:13.5px}
+  .order-row .oc-qty{width:60px;text-align:center}
+  .order-row .oc-times{color:var(--muted);font-family:var(--mono);font-size:12px}
+  .part-src{color:var(--muted);font-size:11px;margin-top:2px;font-family:var(--mono)}
+
+  ::placeholder{color:#54606f}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <header>
+    <div class="badge">🪑</div>
+    <div>
+      <h1>لوحة توزيع الكراسي</h1>
+      <div class="sub">ضيف كرسي واحد أو أكتر بالعدد المطلوب، والأجزاء هتتضاعف وتتوزع تلقائي على كل قسم</div>
+    </div>
+  </header>
+
+  <div class="route-strip">
+    <span class="stop">الكرسي</span><span class="arrow">→</span>
+    <span class="stop">ليزر</span><span class="arrow">→</span>
+    <span class="stop">شاسيهات</span><span class="arrow">→</span>
+    <span class="stop">مشتريات</span><span class="arrow">→</span>
+    <span class="stop">تخطيط</span>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" data-tab="send">الإرسال</div>
+    <div class="tab" data-tab="data">الكراسي والأجزاء</div>
+    <div class="tab" data-tab="settings">الإعدادات</div>
+    <div class="tab" data-tab="guide">دليل تفعيل الإرسال</div>
+  </div>
+
+  <!-- SEND TAB -->
+  <div class="panel active" id="panel-send">
+    <div class="card" style="margin-bottom:18px">
+      <h2 class="section-title"><span class="n">＋</span> إضافة كراسي للطلب</h2>
+      <div class="search-row" style="margin-bottom:0">
+        <input list="chair-list" id="chairInput" type="text" placeholder="اكتب اسم الكرسي…" style="flex:1">
+        <datalist id="chair-list"></datalist>
+        <input type="number" id="chairQtyInput" min="1" value="1" style="width:80px" title="العدد المطلوب">
+        <button class="ghost" id="addToOrderBtn">إضافة للطلب</button>
+      </div>
+      <div id="orderList" style="margin-top:14px"></div>
+    </div>
+
+    <div class="search-row" style="justify-content:flex-end">
+      <button class="ghost" id="clearOrderBtn">تفريغ الطلب</button>
+      <button class="primary" id="sendAllBtn">إرسال لكل الأقسام</button>
+    </div>
+    <div id="noChairMsg" class="empty-note"></div>
+    <div class="tickets" id="ticketsHost"></div>
+  </div>
+
+  <!-- DATA TAB -->
+  <div class="panel" id="panel-data">
+    <div class="card">
+      <h2 class="section-title"><span class="n">01</span> إضافة كرسي جديد</h2>
+      <div class="field">
+        <label class="field-label">اسم الكرسي</label>
+        <input type="text" id="newChairName" placeholder="مثال: BD Manager Chair" style="width:100%">
+      </div>
+      <button class="primary" id="addChairBtn">إضافة الكرسي</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card">
+      <h2 class="section-title"><span class="n">02</span> استيراد ملف Excel / CSV</h2>
+      <p class="helper">الأعمدة المطلوبة بنفس ترتيب الملف اللي بعتهولي: <b>اسم الكرسي</b> — <b>اسم الجزء</b> — <b>القسم</b> — <b>الكميه</b>. لو خلية "اسم الكرسي" فاضية بيتحسب الصف تابع لآخر كرسي فوقه (زي الملف الأصلي بالظبط).</p>
+      <input type="file" id="importFile" accept=".xlsx,.xls,.csv">
+      <div id="importStatus"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title"><span class="n">03</span> الكراسي المسجّلة</h2>
+    <div id="chairsList"></div>
+  </div>
+
+  <!-- SETTINGS TAB -->
+  <div class="panel" id="panel-settings">
+    <div class="card">
+      <h2 class="section-title"><span class="n">01</span> إيميلات الأقسام</h2>
+      <p class="helper">كل قسم ممكن يكون ليه أكتر من إيميل. اكتب الإيميل واضغط "إضافة".</p>
+      <div id="deptEmailsHost"></div>
+      <div class="field" style="margin-top:14px">
+        <label class="field-label">إضافة قسم جديد</label>
+        <div class="add-email">
+          <input type="text" id="newDeptName" placeholder="اسم القسم">
+          <button class="ghost" id="addDeptBtn">إضافة قسم</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="card">
+      <h2 class="section-title"><span class="n">02</span> إعدادات EmailJS</h2>
+      <p class="helper">القيم دي هتلاقيها في حسابك على emailjs.com — لو مش عامل حساب لسه، افتح تبويب "دليل تفعيل الإرسال" جنب كده.</p>
+      <div class="grid2">
+        <div class="field">
+          <label class="field-label">Service ID</label>
+          <input type="text" id="cfgService" placeholder="service_xxxxxxx">
+        </div>
+        <div class="field">
+          <label class="field-label">Template ID</label>
+          <input type="text" id="cfgTemplate" placeholder="template_xxxxxxx">
+        </div>
+      </div>
+      <div class="field">
+        <label class="field-label">Public Key</label>
+        <input type="text" id="cfgKey" placeholder="Public Key" style="width:100%">
+      </div>
+      <button class="primary" id="saveCfgBtn">حفظ الإعدادات</button>
+      <div id="cfgStatus"></div>
+    </div>
+  </div>
+
+  <!-- GUIDE TAB -->
+  <div class="panel guide" id="panel-guide">
+    <div class="step-card">
+      <h3>1) اعمل حساب مجاني</h3>
+      <p class="helper">روح على <code>emailjs.com</code> واعمل حساب مجاني (بيدّيك 200 إيميل شهريًا مجانًا).</p>
+    </div>
+    <div class="step-card">
+      <h3>2) اربط بريد الإرسال</h3>
+      <p class="helper">من Email Services → Add New Service → اختار Gmail واربط حساب <code>mahmoudmarofmobica@gmail.com</code>. هتاخد <b>Service ID</b> بعد كده.</p>
+    </div>
+    <div class="step-card">
+      <h3>3) اعمل Template</h3>
+      <p class="helper">من Email Templates → Create New Template. لازم الحقول دي تتظبط بالظبط:</p>
+      <ul class="helper">
+        <li>حقل "To Email" في إعدادات القالب = <code>{{to_email}}</code></li>
+        <li>Subject مثلاً: <code>أجزاء كرسي {{chair_name}} — قسم {{department}}</code></li>
+        <li>في محتوى الرسالة (Content)، لازم تفتح وضع الكود (Code Editor / &lt;&gt; في الأعلى) وتحط المتغيرات دي مباشرة:</li>
+      </ul>
+      <p class="helper" style="background:var(--panel-2);padding:10px 12px;border-radius:6px">
+        القسم: {{department}}<br>
+        الكراسي المطلوبة: {{chair_name}}<br>
+        عدد الأصناف: {{parts_count}}<br>
+        التاريخ: {{date}}<br><br>
+        {{parts_list}}
+      </p>
+      <p class="helper"><b>مهم:</b> {{parts_list}} بتوصل من الصفحة على هيئة جدول HTML جاهز (فيه صور كل جزء)، فلازم تحطها في وضع الكود مباشرة من غير ما تحوّطها بعلامات اقتباس أو تكتبها في الوضع العادي (Visual)، عشان الجدول يتحول لصورة فعلية مش نص خام.</p>
+      <p class="helper">هتاخد <b>Template ID</b> بعد الحفظ.</p>
+    </div>
+    <div class="step-card">
+      <h3>عن الصور والإرسال لأكتر من قسم</h3>
+      <p class="helper">كل قسم بياخد إيميل منفصل فيه بس الأجزاء المطلوبة منه هو (مش كل الأجزاء)، وده بيحصل تلقائي — مش محتاج تعمل حاجة زيادة.</p>
+      <p class="helper">صور الأجزاء لازم تكون <b>رابط مباشر (URL)</b> لصورة مرفوعة على النت (زي رابط من Google Drive بصلاحية مشاركة عامة، أو أي سيرفر/موقع صور)، مش صورة من جهازك مباشرة — لأن برنامج الإيميل بيجيب الصورة وقت الفتح من الرابط نفسه. تقدر تحط الرابط ده لكل جزء من تبويب "الكراسي والأجزاء" بالضغط على أيقونة 📷 جنب اسم الجزء.</p>
+    </div>
+    <div class="step-card">
+      <h3>4) هات الـ Public Key</h3>
+      <p class="helper">من Account → General → هتلاقي <b>Public Key</b>.</p>
+    </div>
+    <div class="step-card">
+      <h3>5) مهم: اسمح بالإرسال من الصفحة</h3>
+      <p class="helper">من Account → Security، لازم تتأكد إن خيار <code>Allow EmailJS API for non-browser applications</code> شغّال، عشان الصفحة تقدر تبعت الطلب من غير ما يترفض بسبب الـ origin. لو الخيار مش موجود أو ظهرت مشكلة إرسال، امسحلي رسالة الخطأ اللي هتظهر تحت زرار الإرسال وهساعدك تحلها.</p>
+    </div>
+    <div class="step-card">
+      <h3>6) ارجع لتبويب "الإعدادات"</h3>
+      <p class="helper">حط الـ Service ID والـ Template ID والـ Public Key، واضغط حفظ. بعدها جرّب "إرسال لكل الأقسام" من تبويب الإرسال.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const DEFAULT_DEPT_ORDER = ['ليزر','شاسيهات','مشتريات','تخطيط'];
+const DEFAULT_EMAIL = 'mahmoudmarofmobica@gmail.com';
+
+const SEED_CHAIRS = {
+  "BD Manager Chair": [
+    {name:"باليته ادبتر 5mm", dept:"ليزر", qty:1},
+    {name:"حجاب يمين للباليته 3mm", dept:"ليزر", qty:2},
+    {name:"حجاب شمال للباليته 3mm", dept:"ليزر", qty:2},
+    {name:"صاجه ادبتر 8mm", dept:"ليزر", qty:2},
+    {name:"باليته دراع 8mm", dept:"ليزر", qty:1},
+    {name:"باليته ادبتر ب2 حجاب", dept:"شاسيهات", qty:1},
+    {name:"باليته دراع 8mm", dept:"شاسيهات", qty:1},
+    {name:"صاجه ادبتر 8mm", dept:"شاسيهات", qty:2},
+    {name:"Stainless steel bolt M10", dept:"مشتريات", qty:1},
+    {name:"Stainless steel bolt M8", dept:"مشتريات", qty:1},
+    {name:"Stainless steel bolt M6", dept:"مشتريات", qty:3}
+  ],
+  "Laser Lounge High Back Chair": [
+    {name:"باليته 1 ميكانيزم 5 مم", dept:"ليزر", qty:1},
+    {name:"باليته قاعده 8 مم", dept:"ليزر", qty:1},
+    {name:"باليته 2 ميكانيزم 5 مم", dept:"ليزر", qty:1},
+    {name:"باليته ميكانيزم", dept:"شاسيهات", qty:1},
+    {name:"ماسوره 50*2", dept:"شاسيهات", qty:1},
+    {name:"باليته قاعده بماسوره", dept:"شاسيهات", qty:1},
+    {name:"ماسوره 1 25*2.5", dept:"شاسيهات", qty:1},
+    {name:"ماسوره 2 25*2.5", dept:"شاسيهات", qty:1},
+    {name:"ماسوره 3 25*2.5", dept:"شاسيهات", qty:1},
+    {name:"جلبه auto rotate", dept:"مشتريات", qty:1},
+    {name:"طبه نصف كوره", dept:"مشتريات", qty:2}
+  ]
+};
+
+let chairsData = {};
+let departments = [];
+let deptEmails = {};
+let emailCfg = {serviceId:'', templateId:'', publicKey:''};
+
+async function storeGet(key){
+  try{ const r = await window.storage.get(key,false); return r ? JSON.parse(r.value) : null; }
+  catch(e){ return null; }
+}
+async function storeSet(key,val){
+  try{ await window.storage.set(key, JSON.stringify(val), false); }catch(e){ console.error('storage set failed',key,e); }
+}
+
+async function loadAll(){
+  chairsData = await storeGet('chairsData');
+  if(!chairsData){ chairsData = SEED_CHAIRS; await storeSet('chairsData', chairsData); }
+
+  departments = await storeGet('departments');
+  if(!departments){ departments = DEFAULT_DEPT_ORDER.slice(); await storeSet('departments', departments); }
+  ensureDeptsFromData();
+
+  deptEmails = await storeGet('departmentEmails');
+  if(!deptEmails){
+    deptEmails = {};
+    departments.forEach(d=> deptEmails[d] = [DEFAULT_EMAIL]);
+    await storeSet('departmentEmails', deptEmails);
+  }
+  departments.forEach(d=>{ if(!deptEmails[d]) deptEmails[d] = []; });
+
+  const cfg = await storeGet('emailjsConfig');
+  if(cfg) emailCfg = cfg;
+}
+
+function ensureDeptsFromData(){
+  const found = new Set(departments);
+  Object.values(chairsData).forEach(parts=> parts.forEach(p=> found.add(p.dept)) );
+  departments = Array.from(found);
+}
+
+/* ---------- tabs ---------- */
+document.querySelectorAll('.tab').forEach(t=>{
+  t.addEventListener('click', ()=>{
+    document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+    document.querySelectorAll('.panel').forEach(x=>x.classList.remove('active'));
+    t.classList.add('active');
+    document.getElementById('panel-'+t.dataset.tab).classList.add('active');
+  });
+});
+
+/* ---------- SEND TAB ---------- */
+function refreshChairList(){
+  const dl = document.getElementById('chair-list');
+  dl.innerHTML = '';
+  Object.keys(chairsData).forEach(name=>{
+    const opt = document.createElement('option');
+    opt.value = name;
+    dl.appendChild(opt);
+  });
+}
+
+let orderItems = []; // [{chairName, qty}]
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+/* aggregates all order items into per-department, per-part totals with source breakdown */
+function aggregateOrder(){
+  const grouped = {};
+  departments.forEach(d=> grouped[d] = {});
+  orderItems.forEach(item=>{
+    const parts = chairsData[item.chairName] || [];
+    parts.forEach(p=>{
+      if(!grouped[p.dept]) grouped[p.dept] = {};
+      const key = p.name;
+      if(!grouped[p.dept][key]) grouped[p.dept][key] = {name:p.name, qty:0, image:p.image||'', sources:[]};
+      const lineQty = p.qty * item.qty;
+      grouped[p.dept][key].qty += lineQty;
+      if(!grouped[p.dept][key].image && p.image) grouped[p.dept][key].image = p.image;
+      grouped[p.dept][key].sources.push({chair:item.chairName, chairQty:item.qty, lineQty});
+    });
+  });
+  const result = {};
+  departments.forEach(d=> result[d] = Object.values(grouped[d]||{}));
+  return result;
+}
+
+function orderSummaryText(){
+  return orderItems.map(i=> `${i.chairName} ×${i.qty}`).join('، ');
+}
+
+function renderOrderList(){
+  const host = document.getElementById('orderList');
+  host.innerHTML = '';
+  if(!orderItems.length){
+    host.innerHTML = '<div class="empty-note">لسه مفيش كراسي في الطلب. ضيف كرسي وحدد العدد وضغط "إضافة للطلب".</div>';
+    return;
+  }
+  orderItems.forEach((item,idx)=>{
+    const row = document.createElement('div');
+    row.className = 'order-row';
+    row.innerHTML = `
+      <span class="oc-name">${escapeHtml(item.chairName)}</span>
+      <span class="oc-times">×</span>
+      <input type="number" class="oc-qty" min="1" value="${item.qty}">
+      <button class="icon-btn rm-order">✕</button>
+    `;
+    row.querySelector('.oc-qty').addEventListener('input', (e)=>{
+      const v = parseInt(e.target.value) || 1;
+      orderItems[idx].qty = v;
+      renderTickets();
+    });
+    row.querySelector('.rm-order').addEventListener('click', ()=>{
+      orderItems.splice(idx,1);
+      renderOrderList();
+      renderTickets();
+    });
+    host.appendChild(row);
+  });
+}
+
+document.getElementById('addToOrderBtn').addEventListener('click', ()=>{
+  const name = document.getElementById('chairInput').value.trim();
+  const qty = parseInt(document.getElementById('chairQtyInput').value) || 1;
+  if(!name) return;
+  if(!chairsData[name]){
+    alert('الكرسي ده مش مسجل. ضيفه الأول من تبويب "الكراسي والأجزاء".');
+    return;
+  }
+  const existing = orderItems.find(i=>i.chairName===name);
+  if(existing) existing.qty += qty;
+  else orderItems.push({chairName:name, qty});
+  document.getElementById('chairInput').value = '';
+  document.getElementById('chairQtyInput').value = '1';
+  renderOrderList();
+  renderTickets();
+});
+
+document.getElementById('clearOrderBtn').addEventListener('click', ()=>{
+  orderItems = [];
+  renderOrderList();
+  renderTickets();
+});
+
+function renderTickets(){
+  const host = document.getElementById('ticketsHost');
+  const noMsg = document.getElementById('noChairMsg');
+  host.innerHTML = '';
+
+  if(!orderItems.length){
+    noMsg.textContent = '';
+    document.getElementById('sendAllBtn').disabled = true;
+    return;
+  }
+  noMsg.textContent = '';
+  document.getElementById('sendAllBtn').disabled = false;
+
+  const grouped = aggregateOrder();
+  departments.forEach(dept=>{
+    const parts = grouped[dept] || [];
+    const emails = deptEmails[dept] || [];
+    const ticket = document.createElement('div');
+    ticket.className = 'ticket';
+    ticket.dataset.dept = dept;
+
+    let rows = parts.map(p=>{
+      const srcTxt = p.sources.map(s=> `${s.chair}×${s.chairQty}`).join(' + ');
+      const imgCell = p.image ? `<img src="${escapeHtml(p.image)}" class="thumb">` : `<div class="thumb-placeholder">📷</div>`;
+      return `<tr><td class="img-cell">${imgCell}</td><td>${escapeHtml(p.name)}${p.sources.length>1?`<div class="part-src">${escapeHtml(srcTxt)}</div>`:''}</td><td class="qty">${p.qty}</td></tr>`;
+    }).join('');
+    if(!parts.length) rows = `<tr><td colspan="3" class="empty-note">لا توجد أجزاء مطلوبة من هذا القسم لهذا الطلب</td></tr>`;
+
+    ticket.innerHTML = `
+      <div class="stamp">تم الإرسال ✓</div>
+      <div class="ticket-head">
+        <div>
+          <div class="dept-name">${escapeHtml(dept)}</div>
+          <div class="dept-emails">${emails.length? emails.join(' • ') : 'لا يوجد إيميل مسجل'}</div>
+        </div>
+      </div>
+      <div class="ticket-body">
+        <table class="parts">
+          <tr><th></th><th>اسم الجزء</th><th style="text-align:left">الإجمالي</th></tr>
+          ${rows}
+        </table>
+      </div>
+      <div class="ticket-foot">
+        <span class="send-status" style="font-size:11px;color:var(--muted)"></span>
+        <button class="ghost send-one-btn" ${(!parts.length || !emails.length)?'disabled':''}>إرسال لهذا القسم</button>
+      </div>
+    `;
+    ticket.querySelector('.send-one-btn').addEventListener('click', ()=> sendDept(orderSummaryText(), dept, parts, emails, ticket));
+    host.appendChild(ticket);
+  });
+}
+
+async function sendDept(chairName, dept, parts, emails, ticketEl){
+  const statusEl = ticketEl.querySelector('.send-status');
+  const stampEl = ticketEl.querySelector('.stamp');
+  const btn = ticketEl.querySelector('.send-one-btn');
+
+  if(!emailCfg.serviceId || !emailCfg.templateId || !emailCfg.publicKey){
+    statusEl.textContent = 'محتاج تظبط إعدادات EmailJS الأول (تبويب الإعدادات)';
+    statusEl.style.color = 'var(--red)';
+    return;
+  }
+
+  btn.disabled = true;
+  statusEl.textContent = 'جاري الإرسال…';
+  statusEl.style.color = 'var(--muted)';
+
+  const partsList = `
+    <table style="border-collapse:collapse;width:100%;font-family:Arial,sans-serif;font-size:13px" dir="rtl">
+      <tr style="background:#f0f0f0">
+        <th style="padding:6px;border:1px solid #ccc">الصورة</th>
+        <th style="padding:6px;border:1px solid #ccc;text-align:right">اسم الجزء</th>
+        <th style="padding:6px;border:1px solid #ccc">الإجمالي</th>
+      </tr>
+      ${parts.map(p=>{
+        const src = (p.sources && p.sources.length>1) ? `<br><span style="font-size:11px;color:#777">${p.sources.map(s=>`${s.chair}×${s.chairQty}`).join(' + ')}</span>` : '';
+        const img = p.image ? `<img src="${p.image}" width="40" height="40" style="object-fit:cover;border-radius:4px" alt="${p.name}">` : '';
+        return `<tr>
+          <td style="padding:6px;border:1px solid #ccc;text-align:center">${img}</td>
+          <td style="padding:6px;border:1px solid #ccc;text-align:right">${p.name}${src}</td>
+          <td style="padding:6px;border:1px solid #ccc;text-align:center">${p.qty}</td>
+        </tr>`;
+      }).join('')}
+    </table>
+  `.trim();
+  let okCount = 0, failCount = 0;
+
+  for(const email of emails){
+    try{
+      const resp = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({
+          service_id: emailCfg.serviceId,
+          template_id: emailCfg.templateId,
+          user_id: emailCfg.publicKey,
+          template_params: {
+            to_email: email,
+            department: dept,
+            chair_name: chairName,
+            parts_count: parts.length,
+            parts_list: partsList || 'لا توجد أجزاء لهذا القسم',
+            date: new Date().toLocaleDateString('ar-EG')
+          }
+        })
+      });
+      if(resp.ok) okCount++; else failCount++;
+    }catch(e){ failCount++; }
+  }
+
+  btn.disabled = false;
+  if(okCount>0 && failCount===0){
+    statusEl.textContent = `اتبعت لـ ${okCount} إيميل`;
+    statusEl.style.color = 'var(--green)';
+    stampEl.classList.remove('fail'); stampEl.classList.add('show');
+  } else if(okCount>0 && failCount>0){
+    statusEl.textContent = `اتبعت لـ ${okCount}، فشل ${failCount}`;
+    statusEl.style.color = 'var(--amber)';
+    stampEl.classList.remove('fail'); stampEl.classList.add('show');
+  } else {
+    statusEl.textContent = 'فشل الإرسال — راجع إعدادات EmailJS ودليل التفعيل';
+    statusEl.style.color = 'var(--red)';
+    stampEl.textContent = 'فشل الإرسال ✕';
+    stampEl.classList.add('show','fail');
+  }
+}
+
+document.getElementById('sendAllBtn').addEventListener('click', ()=>{
+  if(!orderItems.length) return;
+  document.querySelectorAll('#ticketsHost .ticket .send-one-btn').forEach(btn=>{
+    if(!btn.disabled) btn.click();
+  });
+});
+
+/* ---------- DATA TAB ---------- */
+function thumbHtml(imgUrl){
+  return imgUrl
+    ? `<img src="${escapeHtml(imgUrl)}" class="thumb img-thumb-btn" title="اضغط لتغيير الصورة">`
+    : `<div class="thumb-placeholder img-thumb-btn" title="اضغط لإضافة صورة">📷</div>`;
+}
+
+function wireThumbClick(container){
+  container.querySelectorAll('.img-thumb-btn').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const row = el.closest('.part-row, .add-part-row');
+      const current = row.dataset.image || '';
+      const url = prompt('حط رابط صورة الجزء (URL):', current);
+      if(url === null) return;
+      row.dataset.image = url.trim();
+      const wrap = el.parentElement;
+      wrap.innerHTML = thumbHtml(row.dataset.image);
+      wireThumbClick(wrap);
+    });
+  });
+}
+
+function renderChairsList(){
+  const host = document.getElementById('chairsList');
+  host.innerHTML = '';
+  Object.keys(chairsData).forEach(chairName=>{
+    const block = document.createElement('div');
+    block.className = 'chair-block';
+    const parts = chairsData[chairName];
+
+    const partRowsHtml = parts.map((p,i)=>`
+      <div class="part-row" data-idx="${i}" data-image="${escapeHtml(p.image||'')}">
+        <div class="thumb-cell">${thumbHtml(p.image)}</div>
+        <input type="text" class="p-name" value="${escapeHtml(p.name)}">
+        <select class="p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}" ${d===p.dept?'selected':''}>${escapeHtml(d)}</option>`).join('')}</select>
+        <input type="text" class="p-qty" value="${p.qty}">
+        <button class="icon-btn del-part">✕</button>
+      </div>
+    `).join('');
+
+    block.innerHTML = `
+      <div class="chair-block-head">
+        <span class="cname">${escapeHtml(chairName)} <span style="color:var(--muted);font-weight:400;font-size:12px">(${parts.length} جزء)</span></span>
+        <div style="display:flex;gap:8px">
+          <button class="ghost save-chair-btn">حفظ</button>
+          <button class="danger del-chair-btn">حذف الكرسي</button>
+        </div>
+      </div>
+      <div class="chair-block-body">
+        ${partRowsHtml}
+        <div class="add-part-row" data-image="">
+          <div class="thumb-cell">${thumbHtml('')}</div>
+          <input type="text" class="new-p-name" placeholder="اسم جزء جديد">
+          <select class="new-p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('')}</select>
+          <input type="text" class="new-p-qty" value="1">
+          <button class="icon-btn add-part-btn">+</button>
+        </div>
+      </div>
+    `;
+
+    wireThumbClick(block);
+
+    block.querySelector('.chair-block-head').addEventListener('click',(e)=>{
+      if(e.target.closest('button')) return;
+      block.querySelector('.chair-block-body').classList.toggle('open');
+    });
+
+    block.querySelectorAll('.del-part').forEach(btn=>{
+      btn.addEventListener('click', ()=> btn.closest('.part-row').remove());
+    });
+
+    block.querySelector('.add-part-btn').addEventListener('click', ()=>{
+      const addRow = block.querySelector('.add-part-row');
+      const nameV = block.querySelector('.new-p-name').value.trim();
+      if(!nameV) return;
+      const deptV = block.querySelector('.new-p-dept').value;
+      const qtyV = parseFloat(block.querySelector('.new-p-qty').value) || 1;
+      const imgV = addRow.dataset.image || '';
+      const row = document.createElement('div');
+      row.className = 'part-row';
+      row.dataset.image = imgV;
+      row.innerHTML = `
+        <div class="thumb-cell">${thumbHtml(imgV)}</div>
+        <input type="text" class="p-name" value="${escapeHtml(nameV)}">
+        <select class="p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}" ${d===deptV?'selected':''}>${escapeHtml(d)}</option>`).join('')}</select>
+        <input type="text" class="p-qty" value="${qtyV}">
+        <button class="icon-btn del-part">✕</button>
+      `;
+      wireThumbClick(row);
+      row.querySelector('.del-part').addEventListener('click', ()=> row.remove());
+      addRow.insertAdjacentElement('beforebegin', row);
+      block.querySelector('.new-p-name').value='';
+      block.querySelector('.new-p-qty').value='1';
+      addRow.dataset.image = '';
+      addRow.querySelector('.thumb-cell').innerHTML = thumbHtml('');
+      wireThumbClick(addRow);
+    });
+
+    block.querySelector('.save-chair-btn').addEventListener('click', async ()=>{
+      const newParts = [];
+      block.querySelectorAll('.part-row').forEach(row=>{
+        const name = row.querySelector('.p-name').value.trim();
+        const dept = row.querySelector('.p-dept').value;
+        const qty = parseFloat(row.querySelector('.p-qty').value) || 1;
+        const image = row.dataset.image || '';
+        if(name) newParts.push({name,dept,qty,image});
+      });
+      chairsData[chairName] = newParts;
+      await storeSet('chairsData', chairsData);
+      renderChairsList();
+      refreshChairList();
+      renderTickets();
+    });
+
+    block.querySelector('.del-chair-btn').addEventListener('click', async ()=>{
+      if(!confirm(`متأكد من حذف "${chairName}"؟`)) return;
+      delete chairsData[chairName];
+      await storeSet('chairsData', chairsData);
+      renderChairsList();
+      refreshChairList();
+      renderTickets();
+    });
+
+    host.appendChild(block);
+  });
+}
+
+document.getElementById('addChairBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('newChairName').value.trim();
+  if(!name) return;
+  if(chairsData[name]){ alert('الكرسي ده مسجل بالفعل'); return; }
+  chairsData[name] = [];
+  await storeSet('chairsData', chairsData);
+  document.getElementById('newChairName').value = '';
+  renderChairsList();
+  refreshChairList();
+});
+
+document.getElementById('importFile').addEventListener('change', async (e)=>{
+  const file = e.target.files[0];
+  if(!file) return;
+  const statusEl = document.getElementById('importStatus');
+  statusEl.innerHTML = '<div class="status-msg" style="color:var(--muted)">جاري القراءة…</div>';
+  try{
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, {type:'array'});
+    const sheet = wb.Sheets[wb.SheetNames[0]];
+    const rows = XLSX.utils.sheet_to_json(sheet, {defval:''});
+
+    let lastChair = null;
+    let added = 0, chairsTouched = new Set(), imgSkipped = 0;
+    rows.forEach(r=>{
+      const chairCell = String(r['اسم الكرسي']||'').trim();
+      const partName = String(r['اسم الجزء']||'').trim();
+      const dept = String(r['القسم']||'').trim();
+      const qty = parseFloat(r['الكميه']) || 1;
+      let image = String(r['صوره الجزء']||r['صورة الجزء']||r['رابط الصورة']||'').trim();
+      if(image && !/^https?:\/\//i.test(image)){ image = ''; imgSkipped++; }
+      if(chairCell) lastChair = chairCell;
+      if(!lastChair || !partName) return;
+      if(!chairsData[lastChair]) chairsData[lastChair] = [];
+      chairsData[lastChair].push({name:partName, dept: dept||'غير محدد', qty, image});
+      chairsTouched.add(lastChair);
+      added++;
+    });
+
+    ensureDeptsFromData();
+    await storeSet('departments', departments);
+    departments.forEach(d=>{ if(!deptEmails[d]) deptEmails[d] = [DEFAULT_EMAIL]; });
+    await storeSet('departmentEmails', deptEmails);
+    await storeSet('chairsData', chairsData);
+
+    statusEl.innerHTML = `<div class="status-msg ok">تم استيراد ${added} صف عبر ${chairsTouched.size} كرسي ✓${imgSkipped? `<br>ملحوظة: ${imgSkipped} خانة صورة اتجاهلت لأنها مش رابط مباشر (URL) — الصور المدمجة جوه الإكسيل نفسه مش بتتقرأ تلقائي، لازم رابط صورة مرفوعة على النت.` : ''}</div>`;
+    renderChairsList();
+    refreshChairList();
+    renderDeptEmails();
+  }catch(err){
+    statusEl.innerHTML = `<div class="status-msg err">حصل خطأ في قراءة الملف: ${escapeHtml(err.message)}</div>`;
+  }
+  e.target.value = '';
+});
+
+/* ---------- SETTINGS TAB ---------- */
+function renderDeptEmails(){
+  const host = document.getElementById('deptEmailsHost');
+  host.innerHTML = '';
+  departments.forEach(dept=>{
+    const row = document.createElement('div');
+    row.className = 'dept-row';
+    const emails = deptEmails[dept] || [];
+    row.innerHTML = `
+      <div class="dname">${escapeHtml(dept)}</div>
+      <div class="chips">${emails.map((em,i)=>`<span class="chip" data-i="${i}">${escapeHtml(em)}<button class="rm-email">✕</button></span>`).join('') || '<span style="color:var(--muted);font-size:12px">لا يوجد إيميل بعد</span>'}</div>
+      <div class="add-email">
+        <input type="email" class="new-email-input" placeholder="email@example.com">
+        <button class="ghost add-email-btn">إضافة</button>
+      </div>
+    `;
+    row.querySelectorAll('.rm-email').forEach(btn=>{
+      btn.addEventListener('click', async ()=>{
+        const i = parseInt(btn.closest('.chip').dataset.i);
+        deptEmails[dept].splice(i,1);
+        await storeSet('departmentEmails', deptEmails);
+        renderDeptEmails();
+        renderTickets();
+      });
+    });
+    row.querySelector('.add-email-btn').addEventListener('click', async ()=>{
+      const inp = row.querySelector('.new-email-input');
+      const val = inp.value.trim();
+      if(!val) return;
+      if(!deptEmails[dept]) deptEmails[dept] = [];
+      deptEmails[dept].push(val);
+      await storeSet('departmentEmails', deptEmails);
+      renderDeptEmails();
+      renderTickets();
+    });
+    host.appendChild(row);
+  });
+}
+
+document.getElementById('addDeptBtn').addEventListener('click', async ()=>{
+  const name = document.getElementById('newDeptName').value.trim();
+  if(!name) return;
+  if(departments.includes(name)){ alert('القسم ده موجود بالفعل'); return; }
+  departments.push(name);
+  deptEmails[name] = [];
+  await storeSet('departments', departments);
+  await storeSet('departmentEmails', deptEmails);
+  document.getElementById('newDeptName').value = '';
+  renderDeptEmails();
+  renderTickets();
+});
+
+document.getElementById('saveCfgBtn').addEventListener('click', async ()=>{
+  emailCfg = {
+    serviceId: document.getElementById('cfgService').value.trim(),
+    templateId: document.getElementById('cfgTemplate').value.trim(),
+    publicKey: document.getElementById('cfgKey').value.trim()
+  };
+  await storeSet('emailjsConfig', emailCfg);
+  const el = document.getElementById('cfgStatus');
+  el.innerHTML = '<div class="status-msg ok">تم حفظ الإعدادات ✓</div>';
+  setTimeout(()=> el.innerHTML='', 2500);
+});
+
+function fillCfgInputs(){
+  document.getElementById('cfgService').value = emailCfg.serviceId || '';
+  document.getElementById('cfgTemplate').value = emailCfg.templateId || '';
+  document.getElementById('cfgKey').value = emailCfg.publicKey || '';
+}
+
+/* ---------- init ---------- */
+(async function init(){
+  await loadAll();
+  refreshChairList();
+  renderChairsList();
+  renderDeptEmails();
+  fillCfgInputs();
+  renderOrderList();
+  renderTickets();
+})();
+</script>
+</body>
+</html>
