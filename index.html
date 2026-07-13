@@ -165,9 +165,10 @@
   .chair-block-head .cname{font-weight:900}
   .chair-block-body{padding:14px 16px;display:none}
   .chair-block-body.open{display:block}
-  .part-row{display:grid;grid-template-columns:46px 1.8fr 1.1fr 60px 34px;gap:8px;margin-bottom:8px;align-items:center}
+  .part-row{display:grid;grid-template-columns:82px 1.7fr 1.05fr 60px 34px;gap:8px;margin-bottom:8px;align-items:center}
   .part-row input,.part-row select{width:100%}
-  .add-part-row{display:grid;grid-template-columns:46px 1.8fr 1.1fr 60px 34px;gap:8px;margin-top:10px}
+  .add-part-row{display:grid;grid-template-columns:82px 1.7fr 1.05fr 60px 34px;gap:8px;margin-top:10px}
+  .icons-cell{display:flex;gap:4px}
   .thumb{
     width:38px;height:38px;border-radius:6px;object-fit:cover;
     background:var(--bg-2);border:1px solid var(--border);flex:none;
@@ -175,7 +176,10 @@
   .thumb-placeholder{
     width:38px;height:38px;border-radius:6px;background:var(--bg-2);border:1px dashed var(--border);
     display:flex;align-items:center;justify-content:center;font-size:14px;color:var(--muted);flex:none;
+    cursor:pointer;
   }
+  .thumb-placeholder.has-dxf{border-style:solid;border-color:var(--steel);color:var(--steel)}
+  .thumb.img-thumb-btn{cursor:pointer}
   table.parts td.img-cell{width:42px}
   table.parts img.thumb{width:34px;height:34px}
   .icon-btn{
@@ -282,7 +286,18 @@
 
     <div class="divider"></div>
 
-    <h2 class="section-title"><span class="n">04</span> الكراسي المسجّلة</h2>
+    <div class="card">
+      <h2 class="section-title"><span class="n">04</span> ربط ملفات DXF بالجملة (لقسم الليزر)</h2>
+      <p class="helper">نفس الفكرة بالظبط، بس لملفات الـ DXF بدل الصور. ارفع ملفات الـ DXF في نفس ريبو GitHub (أو أي استضافة تانية) وخد الرابط المباشر لكل ملف، وحط سطر لكل جزء بالشكل: <b>اسم الجزء = رابط ملف DXF</b>. مثال:</p>
+      <p class="helper" style="background:var(--panel-2);padding:8px 10px;border-radius:6px;direction:ltr;text-align:left">باليته ادبتر 5mm = https://raw.githubusercontent.com/.../part1.dxf</p>
+      <textarea id="bulkDxfInput" placeholder="اسم الجزء = رابط ملف DXF (سطر لكل جزء)" style="width:100%;min-height:120px;background:var(--bg-2);border:1px solid var(--border);color:var(--text);border-radius:8px;padding:10px 12px;font-family:var(--mono);font-size:12.5px;direction:ltr;text-align:left"></textarea>
+      <div style="margin-top:10px"><button class="primary" id="applyBulkDxfBtn">تطبيق روابط DXF</button></div>
+      <div id="bulkDxfStatus"></div>
+    </div>
+
+    <div class="divider"></div>
+
+    <h2 class="section-title"><span class="n">05</span> الكراسي المسجّلة</h2>
     <div id="chairsList"></div>
   </div>
 
@@ -486,10 +501,11 @@ function aggregateOrder(){
     parts.forEach(p=>{
       if(!grouped[p.dept]) grouped[p.dept] = {};
       const key = p.name;
-      if(!grouped[p.dept][key]) grouped[p.dept][key] = {name:p.name, qty:0, image:p.image||'', sources:[]};
+      if(!grouped[p.dept][key]) grouped[p.dept][key] = {name:p.name, qty:0, image:p.image||'', dxf:p.dxf||'', sources:[]};
       const lineQty = p.qty * item.qty;
       grouped[p.dept][key].qty += lineQty;
       if(!grouped[p.dept][key].image && p.image) grouped[p.dept][key].image = p.image;
+      if(!grouped[p.dept][key].dxf && p.dxf) grouped[p.dept][key].dxf = p.dxf;
       grouped[p.dept][key].sources.push({chair:item.chairName, chairQty:item.qty, lineQty});
     });
   });
@@ -579,7 +595,8 @@ function renderTickets(){
     let rows = parts.map(p=>{
       const srcTxt = p.sources.map(s=> `${s.chair}×${s.chairQty}`).join(' + ');
       const imgCell = p.image ? `<img src="${escapeHtml(p.image)}" class="thumb">` : `<div class="thumb-placeholder">📷</div>`;
-      return `<tr><td class="img-cell">${imgCell}</td><td>${escapeHtml(p.name)}${p.sources.length>1?`<div class="part-src">${escapeHtml(srcTxt)}</div>`:''}</td><td class="qty">${p.qty}</td></tr>`;
+      const dxfLink = p.dxf ? `<div class="part-src"><a href="${escapeHtml(p.dxf)}" target="_blank" rel="noopener" style="color:var(--steel)">📐 تحميل DXF</a></div>` : '';
+      return `<tr><td class="img-cell">${imgCell}</td><td>${escapeHtml(p.name)}${p.sources.length>1?`<div class="part-src">${escapeHtml(srcTxt)}</div>`:''}${dxfLink}</td><td class="qty">${p.qty}</td></tr>`;
     }).join('');
     if(!parts.length) rows = `<tr><td colspan="3" class="empty-note">لا توجد أجزاء مطلوبة من هذا القسم لهذا الطلب</td></tr>`;
 
@@ -632,9 +649,10 @@ async function sendDept(chairName, dept, parts, emails, ticketEl){
       ${parts.map(p=>{
         const src = (p.sources && p.sources.length>1) ? `<br><span style="font-size:11px;color:#777">${p.sources.map(s=>`${s.chair}×${s.chairQty}`).join(' + ')}</span>` : '';
         const img = p.image ? `<img src="${p.image}" width="40" height="40" style="object-fit:cover;border-radius:4px" alt="${p.name}">` : '';
+        const dxfLink = p.dxf ? `<br><a href="${p.dxf}" style="font-size:11px;color:#2266cc">📐 تحميل ملف DXF</a>` : '';
         return `<tr>
           <td style="padding:6px;border:1px solid #ccc;text-align:center">${img}</td>
-          <td style="padding:6px;border:1px solid #ccc;text-align:right">${p.name}${src}</td>
+          <td style="padding:6px;border:1px solid #ccc;text-align:right">${p.name}${src}${dxfLink}</td>
           <td style="padding:6px;border:1px solid #ccc;text-align:center">${p.qty}</td>
         </tr>`;
       }).join('')}
@@ -696,8 +714,14 @@ function thumbHtml(imgUrl){
     ? `<img src="${escapeHtml(imgUrl)}" class="thumb img-thumb-btn" title="اضغط لتغيير الصورة">`
     : `<div class="thumb-placeholder img-thumb-btn" title="اضغط لإضافة صورة">📷</div>`;
 }
+function dxfHtml(dxfUrl){
+  return `<div class="thumb-placeholder dxf-btn ${dxfUrl?'has-dxf':''}" title="${dxfUrl?'يوجد ملف DXF — اضغط للتغيير':'اضغط لإضافة رابط ملف DXF'}">📐</div>`;
+}
+function iconsCellHtml(imgUrl, dxfUrl){
+  return `<div class="icons-cell">${thumbHtml(imgUrl)}${dxfHtml(dxfUrl)}</div>`;
+}
 
-function wireThumbClick(container){
+function wireRowIcons(container){
   container.querySelectorAll('.img-thumb-btn').forEach(el=>{
     el.addEventListener('click', ()=>{
       const row = el.closest('.part-row, .add-part-row');
@@ -705,9 +729,19 @@ function wireThumbClick(container){
       const url = prompt('حط رابط صورة الجزء (URL):', current);
       if(url === null) return;
       row.dataset.image = url.trim();
-      const wrap = el.parentElement;
-      wrap.innerHTML = thumbHtml(row.dataset.image);
-      wireThumbClick(wrap);
+      el.outerHTML = thumbHtml(row.dataset.image);
+      wireRowIcons(row);
+    });
+  });
+  container.querySelectorAll('.dxf-btn').forEach(el=>{
+    el.addEventListener('click', ()=>{
+      const row = el.closest('.part-row, .add-part-row');
+      const current = row.dataset.dxf || '';
+      const url = prompt('حط رابط ملف DXF بتاع الجزء ده (ارفعه على GitHub أو أي مكان وحط الرابط المباشر):', current);
+      if(url === null) return;
+      row.dataset.dxf = url.trim();
+      el.outerHTML = dxfHtml(row.dataset.dxf);
+      wireRowIcons(row);
     });
   });
 }
@@ -721,8 +755,8 @@ function renderChairsList(){
     const parts = chairsData[chairName];
 
     const partRowsHtml = parts.map((p,i)=>`
-      <div class="part-row" data-idx="${i}" data-image="${escapeHtml(p.image||'')}">
-        <div class="thumb-cell">${thumbHtml(p.image)}</div>
+      <div class="part-row" data-idx="${i}" data-image="${escapeHtml(p.image||'')}" data-dxf="${escapeHtml(p.dxf||'')}">
+        ${iconsCellHtml(p.image, p.dxf)}
         <input type="text" class="p-name" value="${escapeHtml(p.name)}">
         <select class="p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}" ${d===p.dept?'selected':''}>${escapeHtml(d)}</option>`).join('')}</select>
         <input type="text" class="p-qty" value="${p.qty}">
@@ -740,8 +774,8 @@ function renderChairsList(){
       </div>
       <div class="chair-block-body">
         ${partRowsHtml}
-        <div class="add-part-row" data-image="">
-          <div class="thumb-cell">${thumbHtml('')}</div>
+        <div class="add-part-row" data-image="" data-dxf="">
+          ${iconsCellHtml('', '')}
           <input type="text" class="new-p-name" placeholder="اسم جزء جديد">
           <select class="new-p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}">${escapeHtml(d)}</option>`).join('')}</select>
           <input type="text" class="new-p-qty" value="1">
@@ -750,7 +784,7 @@ function renderChairsList(){
       </div>
     `;
 
-    wireThumbClick(block);
+    wireRowIcons(block);
 
     block.querySelector('.chair-block-head').addEventListener('click',(e)=>{
       if(e.target.closest('button')) return;
@@ -768,24 +802,27 @@ function renderChairsList(){
       const deptV = block.querySelector('.new-p-dept').value;
       const qtyV = parseFloat(block.querySelector('.new-p-qty').value) || 1;
       const imgV = addRow.dataset.image || '';
+      const dxfV = addRow.dataset.dxf || '';
       const row = document.createElement('div');
       row.className = 'part-row';
       row.dataset.image = imgV;
+      row.dataset.dxf = dxfV;
       row.innerHTML = `
-        <div class="thumb-cell">${thumbHtml(imgV)}</div>
+        ${iconsCellHtml(imgV, dxfV)}
         <input type="text" class="p-name" value="${escapeHtml(nameV)}">
         <select class="p-dept">${departments.map(d=>`<option value="${escapeHtml(d)}" ${d===deptV?'selected':''}>${escapeHtml(d)}</option>`).join('')}</select>
         <input type="text" class="p-qty" value="${qtyV}">
         <button class="icon-btn del-part">✕</button>
       `;
-      wireThumbClick(row);
+      wireRowIcons(row);
       row.querySelector('.del-part').addEventListener('click', ()=> row.remove());
       addRow.insertAdjacentElement('beforebegin', row);
       block.querySelector('.new-p-name').value='';
       block.querySelector('.new-p-qty').value='1';
       addRow.dataset.image = '';
-      addRow.querySelector('.thumb-cell').innerHTML = thumbHtml('');
-      wireThumbClick(addRow);
+      addRow.dataset.dxf = '';
+      addRow.querySelector('.icons-cell').outerHTML = iconsCellHtml('', '');
+      wireRowIcons(addRow);
     });
 
     block.querySelector('.save-chair-btn').addEventListener('click', async ()=>{
@@ -795,7 +832,8 @@ function renderChairsList(){
         const dept = row.querySelector('.p-dept').value;
         const qty = parseFloat(row.querySelector('.p-qty').value) || 1;
         const image = row.dataset.image || '';
-        if(name) newParts.push({name,dept,qty,image});
+        const dxf = row.dataset.dxf || '';
+        if(name) newParts.push({name,dept,qty,image,dxf});
       });
       chairsData[chairName] = newParts;
       await storeSet('chairsData', chairsData);
@@ -848,10 +886,12 @@ document.getElementById('importFile').addEventListener('change', async (e)=>{
       const qty = parseFloat(r['الكميه']) || 1;
       let image = String(r['صوره الجزء']||r['صورة الجزء']||r['رابط الصورة']||'').trim();
       if(image && !/^https?:\/\//i.test(image)){ image = ''; imgSkipped++; }
+      let dxf = String(r['DXF']||r['رابط DXF']||r['ملف DXF']||'').trim();
+      if(dxf && !/^https?:\/\//i.test(dxf)) dxf = '';
       if(chairCell) lastChair = chairCell;
       if(!lastChair || !partName) return;
       if(!chairsData[lastChair]) chairsData[lastChair] = [];
-      chairsData[lastChair].push({name:partName, dept: dept||'غير محدد', qty, image});
+      chairsData[lastChair].push({name:partName, dept: dept||'غير محدد', qty, image, dxf});
       chairsTouched.add(lastChair);
       added++;
     });
@@ -872,9 +912,7 @@ document.getElementById('importFile').addEventListener('change', async (e)=>{
   e.target.value = '';
 });
 
-document.getElementById('applyBulkImagesBtn').addEventListener('click', async ()=>{
-  const raw = document.getElementById('bulkImageInput').value;
-  const statusEl = document.getElementById('bulkImageStatus');
+function parseBulkMap(raw){
   const lines = raw.split('\n').map(l=>l.trim()).filter(Boolean);
   const map = {};
   lines.forEach(line=>{
@@ -884,6 +922,13 @@ document.getElementById('applyBulkImagesBtn').addEventListener('click', async ()
     const url = line.slice(idx+1).trim();
     if(name && url) map[name] = url;
   });
+  return map;
+}
+
+document.getElementById('applyBulkImagesBtn').addEventListener('click', async ()=>{
+  const raw = document.getElementById('bulkImageInput').value;
+  const statusEl = document.getElementById('bulkImageStatus');
+  const map = parseBulkMap(raw);
   if(!Object.keys(map).length){
     statusEl.innerHTML = `<div class="status-msg err">مفيش أسطر صالحة اتلقت (لازم يكون الشكل: اسم الجزء = رابط)</div>`;
     return;
@@ -899,6 +944,29 @@ document.getElementById('applyBulkImagesBtn').addEventListener('click', async ()
   });
   await storeSet('chairsData', chairsData);
   statusEl.innerHTML = `<div class="status-msg ok">اتطبقت الصور على ${matched} جزء ✓</div>`;
+  renderChairsList();
+  renderTickets();
+});
+
+document.getElementById('applyBulkDxfBtn').addEventListener('click', async ()=>{
+  const raw = document.getElementById('bulkDxfInput').value;
+  const statusEl = document.getElementById('bulkDxfStatus');
+  const map = parseBulkMap(raw);
+  if(!Object.keys(map).length){
+    statusEl.innerHTML = `<div class="status-msg err">مفيش أسطر صالحة اتلقت (لازم يكون الشكل: اسم الجزء = رابط)</div>`;
+    return;
+  }
+  let matched = 0;
+  Object.keys(chairsData).forEach(chairName=>{
+    chairsData[chairName].forEach(part=>{
+      if(map[part.name.trim()]){
+        part.dxf = map[part.name.trim()];
+        matched++;
+      }
+    });
+  });
+  await storeSet('chairsData', chairsData);
+  statusEl.innerHTML = `<div class="status-msg ok">اتطبقت روابط DXF على ${matched} جزء ✓</div>`;
   renderChairsList();
   renderTickets();
 });
